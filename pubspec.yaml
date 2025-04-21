@@ -50,6 +50,7 @@ dependencies:
   flutter_dotenv: ^5.2.1
   envied: ^0.5.3
   intl: ^0.20.2
+  speech_to_text: ^7.0.0
 
 dev_dependencies:
   flutter_test:

@@ -21,6 +21,7 @@ import 'package:exam1_software_movil/src/providers/shopping_cart_provider.dart';
 import 'package:exam1_software_movil/src/services/library_service.dart';
 import 'package:exam1_software_movil/src/services/category_service.dart';
 import 'package:exam1_software_movil/src/widgets/loading_overlay.dart';
+import 'package:exam1_software_movil/src/services/speech_recognition_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -177,6 +178,12 @@ class _MyAppState extends State<MyApp> {
           create: (_) => ThemeProvider(
             onThemeChanged: _setThemeMode,
           ),
+        ),
+        ChangeNotifierProxyProvider<ShoppingCartProvider,
+            RecommendationProvider>(
+          create: (_) => RecommendationProvider(),
+          update: (_, cartProvider, previousRecommendationProvider) =>
+              previousRecommendationProvider ?? RecommendationProvider(),
         ),
       ],
       child: GlobalLoadingOverlay(

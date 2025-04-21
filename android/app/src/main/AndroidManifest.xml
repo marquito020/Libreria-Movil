@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.exam1_software_movil">
+    <!-- Permisos para reconocimiento de voz -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
    <application
         android:label="exam1_software_movil"
         android:name="${applicationName}"

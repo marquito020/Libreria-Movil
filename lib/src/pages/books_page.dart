@@ -6,6 +6,8 @@ import 'package:exam1_software_movil/src/models/book_model.dart';
 import 'package:exam1_software_movil/src/models/category_model.dart';
 import 'package:exam1_software_movil/src/services/library_service.dart';
 import 'package:exam1_software_movil/src/services/category_service.dart';
+import 'package:exam1_software_movil/src/services/speech_recognition_service.dart';
+import 'package:exam1_software_movil/src/providers/shopping_cart_provider.dart';
 import 'package:exam1_software_movil/src/widgets/book_card.dart';
 import 'package:exam1_software_movil/src/pages/loading_page.dart';
 import 'package:exam1_software_movil/src/widgets/custom_gradient_background.dart';
@@ -22,6 +24,8 @@ class _BooksPageState extends State<BooksPage> {
   String _searchQuery = '';
   int? _selectedCategoryId;
   TextEditingController _searchController = TextEditingController();
+  late SpeechRecognitionService _speechRecognitionService;
+  bool _isInitialized = false;
 
   @override
   void initState() {
@@ -29,12 +33,52 @@ class _BooksPageState extends State<BooksPage> {
     // Initialize providers if needed
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<CategoryService>(context, listen: false).loadCategories();
+      _initializeSpeechService();
     });
+  }
+
+  void _initializeSpeechService() {
+    debugPrint('BooksPage: Inicializando servicio de reconocimiento de voz');
+    try {
+      final libraryService =
+          Provider.of<LibraryService>(context, listen: false);
+      final cartProvider =
+          Provider.of<ShoppingCartProvider>(context, listen: false);
+
+      _speechRecognitionService = SpeechRecognitionService(
+        libraryService: libraryService,
+        cartProvider: cartProvider,
+      );
+
+      // Escuchar cambios en el servicio
+      _speechRecognitionService.addListener(() {
+        if (mounted) {
+          setState(() {
+            // Actualizar UI cuando cambie el estado
+            _isInitialized = _speechRecognitionService.isInitialized;
+          });
+        }
+      });
+
+      // Marcar como inicializado para mostrar los botones
+      setState(() {
+        _isInitialized = true;
+      });
+
+      debugPrint('BooksPage: Servicio de reconocimiento de voz inicializado');
+    } catch (e) {
+      debugPrint(
+          'BooksPage: Error al inicializar servicio de reconocimiento: $e');
+      // No hacer nada, los botones de reconocimiento seguirán inhabilitados
+    }
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    if (_isInitialized) {
+      _speechRecognitionService.dispose();
+    }
     super.dispose();
   }
 
@@ -94,14 +138,35 @@ class _BooksPageState extends State<BooksPage> {
       isDark: isDark,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        floatingActionButton: FloatingActionButton(
-          heroTag: "refreshBooksBtn",
-          onPressed: () => libraryService.refreshBooks(),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          backgroundColor: colorScheme.primary,
-          child: Icon(Icons.refresh, color: colorScheme.onPrimary),
+        floatingActionButton: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            // Voice recognition button
+            FloatingActionButton(
+              heroTag: "voiceRecognitionBtn",
+              onPressed: () {
+                _startVoiceRecognition();
+              },
+              backgroundColor: colorScheme.secondary,
+              child: Icon(
+                _isInitialized && _speechRecognitionService.isListening
+                    ? Icons.mic
+                    : Icons.mic_none,
+                color: colorScheme.onSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Refresh button
+            FloatingActionButton(
+              heroTag: "refreshBooksBtn",
+              onPressed: () => libraryService.refreshBooks(),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              backgroundColor: colorScheme.primary,
+              child: Icon(Icons.refresh, color: colorScheme.onPrimary),
+            ),
+          ],
         ),
         body: SafeArea(
           child: Column(
@@ -127,7 +192,7 @@ class _BooksPageState extends State<BooksPage> {
                 ),
               ),
 
-              // Search bar
+              // Search bar with voice button
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -143,38 +208,111 @@ class _BooksPageState extends State<BooksPage> {
                       ),
                     ],
                   ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Buscar libros...',
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: theme.colorScheme.primary,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          onChanged: (value) {
+                            setState(() {
+                              _searchQuery = value;
+                            });
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Buscar libros...',
+                            prefixIcon: Icon(
+                              Icons.search,
+                              color: theme.colorScheme.primary,
+                            ),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(Icons.clear,
+                                        color: colorScheme.primary),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchQuery = '';
+                                        _searchController.clear();
+                                      });
+                                    },
+                                  )
+                                : null,
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                          ),
+                        ),
                       ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon:
-                                  Icon(Icons.clear, color: colorScheme.primary),
-                              onPressed: () {
-                                setState(() {
-                                  _searchQuery = '';
-                                  _searchController.clear();
-                                });
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                    ),
+                      // Voice search button
+                      IconButton(
+                        icon: Icon(
+                          _isInitialized &&
+                                  _speechRecognitionService.isListening
+                              ? Icons.mic
+                              : Icons.mic_none,
+                          color: _isInitialized &&
+                                  _speechRecognitionService.isListening
+                              ? colorScheme.secondary
+                              : colorScheme.primary,
+                        ),
+                        onPressed: _startVoiceRecognition,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                   ),
                 ),
               ),
+
+              // Voice recognition status
+              if (_isInitialized &&
+                  _speechRecognitionService.lastWords.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.record_voice_over,
+                          color: colorScheme.onSecondaryContainer,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _speechRecognitionService.lastWords,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSecondaryContainer,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.close,
+                            color: colorScheme.onSecondaryContainer,
+                            size: 18,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              // This will trigger a rebuild
+                            });
+                          },
+                          constraints: const BoxConstraints.tightFor(
+                            width: 32,
+                            height: 32,
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
               // Category chips
               categoryService.isLoading
@@ -283,6 +421,60 @@ class _BooksPageState extends State<BooksPage> {
     );
   }
 
+  void _startVoiceRecognition() async {
+    if (!_isInitialized) {
+      debugPrint(
+          'BooksPage: No se puede iniciar el reconocimiento, servicio no inicializado');
+      _showErrorDialog(
+          'El servicio de reconocimiento de voz no está disponible');
+      return;
+    }
+
+    debugPrint('BooksPage: Iniciando reconocimiento de voz');
+
+    // Iniciar el reconocimiento de voz
+    bool success = await _speechRecognitionService.startListening();
+
+    // Si no se pudo iniciar el reconocimiento, mostrar un error
+    if (!success) {
+      if (!context.mounted) return;
+      _showErrorDialog('No se pudo iniciar el reconocimiento de voz');
+      return;
+    }
+
+    // Mostrar diálogo con feedback en tiempo real
+    if (!context.mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => _VoiceRecognitionDialog(
+        speechRecognitionService: _speechRecognitionService,
+      ),
+    ).then((_) {
+      // Al cerrar el diálogo, actualizar la interfaz
+      if (mounted) {
+        setState(() {});
+      }
+    });
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error de reconocimiento de voz'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Aceptar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCategoryChip({
     required BuildContext context,
     required String label,
@@ -309,6 +501,254 @@ class _BooksPageState extends State<BooksPage> {
         ),
       ),
     );
+  }
+}
+
+/// Diálogo para mostrar el estado del reconocimiento de voz
+class _VoiceRecognitionDialog extends StatefulWidget {
+  final SpeechRecognitionService speechRecognitionService;
+
+  const _VoiceRecognitionDialog({
+    required this.speechRecognitionService,
+  });
+
+  @override
+  State<_VoiceRecognitionDialog> createState() =>
+      _VoiceRecognitionDialogState();
+}
+
+class _VoiceRecognitionDialogState extends State<_VoiceRecognitionDialog> {
+  late SpeechRecognitionService _service;
+  bool _closed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _service = widget.speechRecognitionService;
+
+    try {
+      _service.addListener(_refresh);
+
+      // Auto-cerrar el diálogo después de cierto tiempo de inactividad
+      Future.delayed(const Duration(seconds: 30), () {
+        if (mounted && !_closed) {
+          _closed = true;
+          Navigator.of(context).pop();
+        }
+      });
+
+      debugPrint(
+          'VoiceRecognitionDialog: Diálogo iniciado, isListening=${_service.isListening}');
+    } catch (e) {
+      debugPrint('VoiceRecognitionDialog: Error al inicializar - $e');
+      // Cerrar el diálogo si hay un error
+      Future.microtask(() {
+        if (mounted && !_closed) {
+          _closed = true;
+          Navigator.of(context).pop();
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    try {
+      _service.removeListener(_refresh);
+    } catch (e) {
+      debugPrint('VoiceRecognitionDialog: Error al remover listener - $e');
+    }
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted && !_closed) {
+      try {
+        setState(() {});
+
+        // Auto-cerrar el diálogo cuando se ha procesado el comando exitosamente
+        if (_service.lastWords.startsWith('Añadido al carrito:')) {
+          _closed = true;
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              Navigator.of(context).pop();
+            }
+          });
+        }
+      } catch (e) {
+        debugPrint('VoiceRecognitionDialog: Error en refresh - $e');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Dialog(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Reconocimiento de voz',
+              style: theme.textTheme.titleLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _getStatusColor(colorScheme),
+              ),
+              child: Center(
+                child: Icon(
+                  _getStatusIcon(),
+                  color: _getStatusIconColor(colorScheme),
+                  size: 40,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              _getStatusText(),
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _getMessageText(),
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    _closed = true;
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Cerrar'),
+                ),
+                if (_service.isInitialized && !_service.isListening)
+                  TextButton(
+                    onPressed: () {
+                      _service.startListening();
+                    },
+                    child: const Text('Intentar de nuevo'),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(ColorScheme colorScheme) {
+    if (!_service.isInitialized) {
+      return colorScheme.error.withOpacity(0.2);
+    }
+
+    if (_service.isListening) {
+      return colorScheme.primary.withOpacity(0.2);
+    }
+
+    if (_service.lastWords.startsWith('Añadido al carrito:')) {
+      return colorScheme.secondary.withOpacity(0.2);
+    }
+
+    if (_service.lastWords.startsWith('No se encontró')) {
+      return colorScheme.error.withOpacity(0.2);
+    }
+
+    return colorScheme.surfaceVariant;
+  }
+
+  Color _getStatusIconColor(ColorScheme colorScheme) {
+    if (!_service.isInitialized) {
+      return colorScheme.error;
+    }
+
+    if (_service.isListening) {
+      return colorScheme.primary;
+    }
+
+    if (_service.lastWords.startsWith('Añadido al carrito:')) {
+      return colorScheme.secondary;
+    }
+
+    if (_service.lastWords.startsWith('No se encontró')) {
+      return colorScheme.error;
+    }
+
+    return colorScheme.onSurfaceVariant;
+  }
+
+  IconData _getStatusIcon() {
+    if (!_service.isInitialized) {
+      return Icons.error_outline;
+    }
+
+    if (_service.isListening) {
+      return Icons.mic;
+    }
+
+    if (_service.lastWords.startsWith('Añadido al carrito:')) {
+      return Icons.check_circle_outline;
+    }
+
+    if (_service.lastWords.startsWith('No se encontró')) {
+      return Icons.highlight_off;
+    }
+
+    return Icons.mic_off;
+  }
+
+  String _getStatusText() {
+    if (!_service.isInitialized) {
+      return 'Error de inicialización';
+    }
+
+    if (_service.isListening) {
+      return 'Escuchando...';
+    }
+
+    if (_service.lastWords.startsWith('Añadido al carrito:')) {
+      return '¡Producto añadido!';
+    }
+
+    if (_service.lastWords.startsWith('No se encontró')) {
+      return 'Producto no encontrado';
+    }
+
+    return 'Procesando...';
+  }
+
+  String _getMessageText() {
+    if (!_service.isInitialized) {
+      return _service.initError.isNotEmpty
+          ? _service.initError
+          : 'No se pudo inicializar el reconocimiento de voz';
+    }
+
+    if (_service.lastWords.isEmpty) {
+      return 'Diga el nombre del libro que desea agregar al carrito';
+    }
+
+    return _service.lastWords;
   }
 }
 

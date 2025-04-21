@@ -24,6 +24,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Esta aplicación necesita acceso al micrófono para reconocer comandos de voz para añadir libros al carrito</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Esta aplicación utiliza el reconocimiento de voz para convertir voz a texto y añadir libros al carrito</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

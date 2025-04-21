@@ -10,8 +10,6 @@ import 'package:exam1_software_movil/src/pages/cart_page.dart';
 import 'package:exam1_software_movil/src/share_preferens/user_preferences.dart';
 import 'package:exam1_software_movil/src/routes/routes.dart';
 import 'package:exam1_software_movil/src/widgets/custom_gradient_background.dart';
-import 'package:exam1_software_movil/src/widgets/nova_logo.dart';
-import 'package:exam1_software_movil/src/constants/theme.dart';
 import 'package:exam1_software_movil/src/providers/providers.dart';
 import 'package:provider/provider.dart';
 
@@ -95,7 +93,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final colorScheme = theme.colorScheme;
-    final themeProvider = Provider.of<ThemeProvider>(context);
     final cartProvider = Provider.of<ShoppingCartProvider>(context);
 
     return MultiProvider(

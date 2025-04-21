@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'package:exam1_software_movil/src/constants/theme.dart';
 import 'package:exam1_software_movil/src/models/book_model.dart';
 import 'package:exam1_software_movil/src/providers/shopping_cart_provider.dart';
 import 'package:exam1_software_movil/src/widgets/custom_gradient_background.dart';
